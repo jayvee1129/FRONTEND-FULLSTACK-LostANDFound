@@ -9,6 +9,7 @@ const API_HOSTS = [
   'http://192.168.30.142:8000',
   'http://127.0.0.1:8000',
   'http://localhost:8000',
+  'https://backend-fullstack-lostandfound.onrender.com',
 ];
 
 let CURRENT_HOST = API_HOSTS[0]; // will store the host that worked last
