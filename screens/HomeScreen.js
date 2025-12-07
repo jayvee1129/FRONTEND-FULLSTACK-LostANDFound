@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { homeStyles as styles } from './style';
 import axios from 'axios';
 import { useIsFocused } from '@react-navigation/native';
 
@@ -10,13 +11,17 @@ const API_HOSTS = [
   'http://localhost:8000',
 ];
 
+let CURRENT_HOST = API_HOSTS[0]; // Track which host works
+
 async function apiRequest(method, path, data = null) {
   let lastErr = null;
   for (const host of API_HOSTS) {
     const url = host + path;
     try {
       if (method === 'GET') {
-        return await axios.get(url);
+        const response = await axios.get(url, { timeout: 5000 });  // 5 second timeout
+        CURRENT_HOST = host; // Remember which host worked
+        return response;
       }
     } catch (err) {
       lastErr = err;
@@ -26,33 +31,77 @@ async function apiRequest(method, path, data = null) {
   throw lastErr;
 }
 
+function getFullImageUrl(imagePath) {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('http')) return imagePath;
+  return CURRENT_HOST + imagePath;
+}
+
 export default function HomeScreen({ navigation }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const isFocused = useIsFocused(); // triggers when screen comes into focus
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const isFocused = useIsFocused();
+  // Request a large page size so all posts are returned in one request.
+  // Adjust this number to match expected maximum posts (e.g. 1000).
+  const ITEMS_PER_PAGE = 1000;
 
   // Fetch on mount
   useEffect(() => {
-    fetchItems();
+    setPage(1);
+    setItems([]);
+    fetchItems(1, true);
   }, []);
 
   // Also refresh when screen becomes focused
   useEffect(() => {
-    if (isFocused) fetchItems();
+    if (isFocused) {
+      setPage(1);
+      setItems([]);
+      fetchItems(1, true);
+    }
   }, [isFocused]);
 
-  const fetchItems = async () => {
+  const fetchItems = async (pageNum, reset = false) => {
     setError(null);
-    setLoading(true);
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
+    
     try {
-      const response = await apiRequest('GET', '/api/items/');
-      setItems(response.data);
+      // Always request the full set (large limit). Backend will return all items.
+      const response = await apiRequest('GET', `/api/items/?limit=${ITEMS_PER_PAGE}&offset=0`);
+      const newItems = response.data.results || response.data;
+
+      // Replace items when resetting or on first load. We fetch all posts at once.
+      setItems(newItems);
+      setHasMore(false);
+      setPage(1);
+
+      // Prefetch images so the list renders quickly with cached images.
+      try {
+        newItems.forEach((it) => {
+          const url = getFullImageUrl(it.image);
+          if (url) Image.prefetch(url).catch(() => {});
+        });
+      } catch (e) {
+        // ignore prefetch errors
+      }
       setLoading(false);
     } catch (err) {
       console.error('Fetch items error:', err.message || err);
       setError(err.message || 'Network error');
       setLoading(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (hasMore && !loadingMore) {
+      fetchItems(page + 1);
     }
   };
 
@@ -63,25 +112,54 @@ export default function HomeScreen({ navigation }) {
           ListHeaderComponent={() => (
             <View style={{paddingBottom:8}}>
               {error ? <Text style={{color: 'red', marginBottom: 8}}>{error}</Text> : null}
-              <TouchableOpacity onPress={fetchItems} style={{alignSelf:'flex-end', marginBottom:8}}>
+              <TouchableOpacity onPress={() => fetchItems(1, true)} style={{alignSelf:'flex-end', marginBottom:8}}>
                 <Text style={{color:'#007AFF'}}>Refresh</Text>
               </TouchableOpacity>
             </View>
           )}
+          ListFooterComponent={() => (
+            loadingMore ? <ActivityIndicator size="small" style={{marginVertical: 20}} /> : null
+          )}
+          // We fetch all items in one request so infinite scroll is unnecessary.
+          onEndReachedThreshold={0.5}
+          initialNumToRender={10}
+          windowSize={10}
           data={items}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <TouchableOpacity onPress={() => navigation.navigate('Detail', { item })}>
-              <View style={styles.card}>
-                <View style={styles.headerRow}>
-                  <Text style={styles.title}>{item.title}</Text>
-                  <Text style={[styles.badge, item.status === 'LOST' ? styles.lost : styles.found]}>
-                    {item.status}
-                  </Text>
+              {item.image ? (
+                // WITH IMAGE: horizontal card
+                <View style={styles.cardRow}>
+                  <View style={styles.leftThumbWrap}>
+                    <Image 
+                      source={{ uri: getFullImageUrl(item.image) }} 
+                      style={styles.thumb}
+                      defaultSource={require('../assets/icon.png')}
+                      cache="force-cache"
+                    />
+                  </View>
+
+                  <View style={styles.contentRight}>
+                    <View style={styles.rowTop}>
+                      <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+                      <Text style={[styles.badge, item.status === 'LOST' ? styles.lost : styles.found]}>{item.status}</Text>
+                    </View>
+
+                    <Text numberOfLines={1} style={styles.subtitle}>{item.description}</Text>
+                    <Text style={styles.date}>{new Date(item.date_posted).toLocaleDateString()}, {new Date(item.date_posted).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                  </View>
                 </View>
-                <Text numberOfLines={2} style={styles.desc}>{item.description}</Text>
-                <Text style={styles.date}>{new Date(item.date_posted).toLocaleDateString()}</Text>
-              </View>
+              ) : (
+                // NO IMAGE: vertical card with Status/Date
+                <View style={styles.cardNoImage}>
+                  <Text style={styles.cardValue} numberOfLines={1}>{item.title}</Text>
+                  
+                  <Text style={styles.cardLabel}>Status: <Text style={[styles.statusBadgeText, item.status === 'LOST' ? styles.lostText : styles.foundText]}>{item.status}</Text></Text>
+                  
+                  <Text style={styles.cardDate}>{new Date(item.date_posted).toLocaleDateString()}, {new Date(item.date_posted).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
         />
@@ -90,14 +168,4 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f2f2f2', padding: 10 },
-  card: { backgroundColor: 'white', padding: 15, marginBottom: 10, borderRadius: 10, elevation: 2 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-  title: { fontSize: 18, fontWeight: 'bold' },
-  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 5, overflow: 'hidden', color: 'white', fontSize: 12 },
-  lost: { backgroundColor: '#d9534f' },
-  found: { backgroundColor: '#5cb85c' },
-  desc: { color: '#555', marginBottom: 5 },
-  date: { color: '#999', fontSize: 12 }
-});
+// styles are imported from ./style and are named `styles` at the top

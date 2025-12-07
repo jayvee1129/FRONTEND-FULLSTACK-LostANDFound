@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { TouchableOpacity, Text } from 'react-native';
+import { HeaderBackButton } from '@react-navigation/elements';
 
 // Import Screens
 import WelcomeScreen from './screens/WelcomeScreen';
@@ -17,17 +18,21 @@ const Stack = createStackNavigator();
 function HomeTabs({ navigation }) {
   return (
     <Tab.Navigator 
-      screenOptions={{
+      screenOptions={({ route, navigation }) => ({
         headerShown: true,
         headerStyle: { backgroundColor: '#f8f9fa' },
         headerTintColor: '#007AFF',
         headerTitleStyle: { fontWeight: 'bold' },
-        headerLeft: () => (
-          <TouchableOpacity onPress={() => navigation.navigate('Welcome')} style={{marginLeft: 15}}>
-            <Text style={{color: '#007AFF', fontSize: 16, fontWeight: '600'}}>← Welcome</Text>
-          </TouchableOpacity>
-        ),
-      }}
+        headerLeft: (props) => {
+          // Use the native back arrow style for consistency with the Detail screen.
+          // - On the Home tab: go back to the Welcome screen
+          // - On the Post Item tab: go to the Home tab (so back returns only to Home)
+          if (route.name === 'Post Item') {
+            return <HeaderBackButton {...props} tintColor="#007AFF" onPress={() => navigation.navigate('Home')} />;
+          }
+          return <HeaderBackButton {...props} tintColor="#007AFF" onPress={() => navigation.navigate('Welcome')} />;
+        },
+      })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Post Item" component={AddItemScreen} />
@@ -39,7 +44,7 @@ function HomeTabs({ navigation }) {
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: true }} initialRouteName="Main">
+      <Stack.Navigator screenOptions={{ headerShown: true }} initialRouteName="Welcome">
         {/* Welcome screen is the initial route */}
         <Stack.Screen 
           name="Welcome" 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Button, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, Button, ScrollView, Image } from 'react-native';
+import { welcomeStyles as styles } from './style';
 
 export default function WelcomeScreen({ navigation }) {
   return (
@@ -45,96 +46,3 @@ export default function WelcomeScreen({ navigation }) {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: '#f8f9fa',
-    paddingBottom: 30,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#1a1a1a',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    textAlign: 'center',
-    color: '#007AFF',
-    marginBottom: 20,
-  },
-  divider: {
-    height: 2,
-    backgroundColor: '#007AFF',
-    marginVertical: 20,
-    width: '60%',
-    alignSelf: 'center',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleBlock: {
-    alignItems: 'center',
-  },
-  logo: {
-    width: 250,
-    height: 100,
-    marginLeft: -50,
-  },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#555',
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  featuresContainer: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    elevation: 2,
-  },
-  featuresTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 10,
-  },
-  feature: {
-    fontSize: 14,
-    color: '#333',
-    marginVertical: 5,
-  },
-  howItWorks: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 30,
-    elevation: 2,
-  },
-  howTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 10,
-  },
-  howStep: {
-    fontSize: 14,
-    color: '#333',
-    marginVertical: 5,
-  },
-  buttonContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-});

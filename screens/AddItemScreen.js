@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert, Text, TouchableOpacity } from 'react-native';
+import { View, TextInput, Button, Alert, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
+import { addItemStyles as styles } from './style';
 import axios from 'axios';
+import * as ImagePicker from 'expo-image-picker';
 
 // Try multiple hosts as fallback
 const API_HOSTS = [
@@ -9,14 +11,32 @@ const API_HOSTS = [
   'http://localhost:8000',
 ];
 
-async function apiRequest(method, path, data = null) {
+let CURRENT_HOST = API_HOSTS[0]; // will store the host that worked last
+
+async function apiRequest(method, path, data = null, isFormData = false) {
   let lastErr = null;
   for (const host of API_HOSTS) {
     const url = host + path;
     try {
-      if (method === 'POST') {
-        return await axios.post(url, data);
+      // For FormData in Expo/React Native, fetch is more reliable than axios
+      if (isFormData && method === 'POST') {
+        const resp = await fetch(url, {
+          method: 'POST',
+          body: data,
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(`HTTP ${resp.status}: ${text}`);
+        }
+        const json = await resp.json();
+        CURRENT_HOST = host;
+        return { data: json };
       }
+
+      // Non-form requests via axios
+      const resp = await axios({ method, url, data });
+      CURRENT_HOST = host;
+      return resp;
     } catch (err) {
       lastErr = err;
       console.warn(`${method} failed for ${url}:`, err.message || err);
@@ -30,57 +50,115 @@ export default function AddItemScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [contact, setContact] = useState('');
   const [status, setStatus] = useState('LOST');
+  const [image, setImage] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.6,  // Reduced from 0.8 for faster upload
+      });
+
+      if (!result.canceled) {
+        setImage(result.assets[0]);
+      }
+    } catch (error) {
+      console.error('Image picker error:', error);
+      Alert.alert('Error', 'Failed to pick image. Make sure you have granted permissions.');
+    }
+  };
 
   const handleSubmit = async () => {
+    if (!title.trim()) {
+      Alert.alert('Error', 'Please enter an item title');
+      return;
+    }
+
     try {
-      const response = await apiRequest('POST', '/api/items/', { 
-        title, 
-        description, 
-        status,
-        contact_info: contact
-      });
+      setLoading(true);
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('status', status);
+      formData.append('contact_info', contact);
+
+      if (image) {
+        try {
+          const fileName = `item-${Date.now()}.jpg`;
+          // Fetch the local file and convert to blob — this is more reliable on Expo/Android
+          const fileResp = await fetch(image.uri);
+          const blob = await fileResp.blob();
+          formData.append('image', blob, fileName);
+          console.log('Image blob appended, size:', blob.size, 'type:', blob.type);
+        } catch (err) {
+          console.warn('Failed to append image blob, falling back to direct uri append', err);
+          const imageFile = {
+            uri: image.uri,
+            type: 'image/jpeg',
+            name: `item-${Date.now()}.jpg`,
+          };
+          formData.append('image', imageFile);
+          console.log('Image being sent (fallback):', imageFile);
+        }
+      }
+
+      const response = await apiRequest('POST', '/api/items/', formData, true);
       console.log('Item posted successfully:', response.data);
+      // Extra logging for debug
+      if (!response || !response.data) console.warn('No response data from server');
       Alert.alert("Success", "Item Posted!");
-      setTitle(''); setDescription(''); setContact('');
-      navigation.navigate('Home'); 
+      setTitle('');
+      setDescription('');
+      setContact('');
+      setImage(null);
+      navigation.navigate('Home');
     } catch (error) {
       console.error('Error details:', error.response?.data || error.message);
       Alert.alert("Error", error.response?.data?.detail || "Could not post item: " + (error.message || 'Network error'));
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.label}>What is the item?</Text>
       <TextInput style={styles.input} placeholder="e.g. Blue Wallet" value={title} onChangeText={setTitle} />
       
       <Text style={styles.label}>Description</Text>
-      <TextInput style={styles.input} placeholder="Details..." value={description} onChangeText={setDescription} multiline />
+      <TextInput style={styles.input} placeholder="Details..." value={description} onChangeText={setDescription} multiline numberOfLines={4} />
 
       <Text style={styles.label}>Contact Info</Text>
       <TextInput style={styles.input} placeholder="Phone or Email" value={contact} onChangeText={setContact} />
 
+      <Text style={styles.label}>Upload Photo (Optional)</Text>
+      {image && (
+        <View style={styles.imageContainer}>
+          <Image source={{ uri: image.uri }} style={styles.imagePreview} />
+          <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImage(null)}>
+            <Text style={styles.removeImageText}>Remove Image</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      <TouchableOpacity style={styles.uploadBtn} onPress={pickImage} disabled={loading}>
+        <Text style={styles.uploadBtnText}>📁 Upload Image from Device</Text>
+      </TouchableOpacity>
+
       <View style={styles.statusContainer}>
-        <TouchableOpacity style={[styles.btn, status==='LOST' && styles.activeLost]} onPress={()=>setStatus('LOST')}>
+        <TouchableOpacity style={[styles.btn, status==='LOST' && styles.activeLost]} onPress={()=>setStatus('LOST')} disabled={loading}>
           <Text style={styles.btnText}>LOST</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, status==='FOUND' && styles.activeFound]} onPress={()=>setStatus('FOUND')}>
+        <TouchableOpacity style={[styles.btn, status==='FOUND' && styles.activeFound]} onPress={()=>setStatus('FOUND')} disabled={loading}>
           <Text style={styles.btnText}>FOUND</Text>
         </TouchableOpacity>
       </View>
 
-      <Button title="Post Item" onPress={handleSubmit} />
-    </View>
+      <Button title={loading ? "Posting..." : "Post Item"} onPress={handleSubmit} disabled={loading} />
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: '#fff' },
-  label: { fontWeight: 'bold', marginTop: 10 },
-  input: { borderWidth: 1, borderColor: '#ddd', padding: 10, borderRadius: 5, marginBottom: 10 },
-  statusContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  btn: { flex: 1, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#ddd' },
-  activeLost: { backgroundColor: '#d9534f', borderColor: '#d9534f' },
-  activeFound: { backgroundColor: '#5cb85c', borderColor: '#5cb85c' },
-  btnText: { fontWeight: 'bold' }
-});
