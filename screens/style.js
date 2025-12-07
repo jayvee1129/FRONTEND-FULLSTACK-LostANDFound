@@ -123,6 +123,11 @@ export const detailStyles = StyleSheet.create({
 
 export const homeStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f2f2f2', padding: 10 },
+  searchContainer: { paddingVertical: 6, paddingHorizontal: 6 },
+  searchInput: { backgroundColor: 'white', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#e6e6e6', color: 'rgba(0,0,0,0.85)', fontWeight: '400', fontSize: 14 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 },
+  refreshBtn: { marginLeft: 8, backgroundColor: 'white', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: '#e6e6e6', elevation: 2 },
+  refreshBtnText: { color: '#007AFF', fontWeight: '600' },
   cardRow: { backgroundColor: 'white', padding: 12, marginBottom: 10, borderRadius: 10, elevation: 2, flexDirection: 'row', alignItems: 'center' },
   leftThumbWrap: { marginRight: 12 },
   thumb: { width: 72, height: 72, borderRadius: 8, backgroundColor: '#eee' },

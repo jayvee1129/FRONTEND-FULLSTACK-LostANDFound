@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image, TextInput } from 'react-native';
 import { homeStyles as styles } from './style';
 import axios from 'axios';
 import { useIsFocused } from '@react-navigation/native';
@@ -39,8 +39,10 @@ function getFullImageUrl(imagePath) {
 
 export default function HomeScreen({ navigation }) {
   const [items, setItems] = useState([]);
+  const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -65,6 +67,27 @@ export default function HomeScreen({ navigation }) {
     }
   }, [isFocused]);
 
+  // Update filtered items when items or query change (debounced)
+  useEffect(() => {
+    const doFilter = () => {
+      if (!query || !query.trim()) {
+        setFilteredItems(items);
+        return;
+      }
+      const q = query.trim().toLowerCase();
+      const out = items.filter((it) => {
+        const t = (it.title || '').toLowerCase();
+        const d = (it.description || '').toLowerCase();
+        return t.includes(q) || d.includes(q);
+      });
+      setFilteredItems(out);
+    };
+
+    // small debounce for typing
+    const handle = setTimeout(doFilter, 200);
+    return () => clearTimeout(handle);
+  }, [items, query]);
+
   const fetchItems = async (pageNum, reset = false) => {
     setError(null);
     if (reset) setLoading(true);
@@ -77,6 +100,7 @@ export default function HomeScreen({ navigation }) {
 
       // Replace items when resetting or on first load. We fetch all posts at once.
       setItems(newItems);
+      setFilteredItems(newItems);
       setHasMore(false);
       setPage(1);
 
@@ -108,25 +132,52 @@ export default function HomeScreen({ navigation }) {
   return (
     <View style={styles.container}>
       {loading ? <ActivityIndicator size="large" /> : (
-        <FlatList
-          ListHeaderComponent={() => (
-            <View style={{paddingBottom:8}}>
-              {error ? <Text style={{color: 'red', marginBottom: 8}}>{error}</Text> : null}
-              <TouchableOpacity onPress={() => fetchItems(1, true)} style={{alignSelf:'flex-end', marginBottom:8}}>
-                <Text style={{color:'#007AFF'}}>Refresh</Text>
+        <>
+          <View>
+            <View style={styles.searchRow}>
+              <View style={{flex: 1}}>
+                <View style={styles.searchContainer}>
+                  <TextInput
+                    placeholder="Search items (title or description)"
+                    placeholderTextColor={'rgba(0,0,0,0.45)'}
+                    value={query}
+                    onChangeText={setQuery}
+                    style={styles.searchInput}
+                    returnKeyType="search"
+                    selectionColor={'#007AFF'}
+                    blurOnSubmit={false}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.refreshBtn}
+                onPress={() => fetchItems(1, true)}
+                accessibilityLabel="Refresh items"
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#007AFF" />
+                ) : (
+                  <Text style={styles.refreshBtnText}>Refresh</Text>
+                )}
               </TouchableOpacity>
             </View>
-          )}
-          ListFooterComponent={() => (
-            loadingMore ? <ActivityIndicator size="small" style={{marginVertical: 20}} /> : null
-          )}
-          // We fetch all items in one request so infinite scroll is unnecessary.
-          onEndReachedThreshold={0.5}
-          initialNumToRender={10}
-          windowSize={10}
-          data={items}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
+
+            {error ? <Text style={{color: 'red', marginTop: 8}}>{error}</Text> : null}
+          </View>
+
+          <FlatList
+            ListFooterComponent={() => (
+              loadingMore ? <ActivityIndicator size="small" style={{marginVertical: 20}} /> : null
+            )}
+            // We fetch all items in one request so infinite scroll is unnecessary.
+            onEndReachedThreshold={0.5}
+            keyboardShouldPersistTaps="handled"
+            initialNumToRender={10}
+            windowSize={10}
+            data={filteredItems.length ? filteredItems : items}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
             <TouchableOpacity onPress={() => navigation.navigate('Detail', { item })}>
               {item.image ? (
                 // WITH IMAGE: horizontal card
@@ -163,6 +214,7 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
           )}
         />
+          </>
       )}
     </View>
   );
