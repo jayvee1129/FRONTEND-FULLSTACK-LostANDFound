@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, TextInput, Button, Alert, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
-import { addItemStyles as styles } from './style';
+import { View, TextInput, Button, Alert, Text, TouchableOpacity, Image, ScrollView, ImageBackground } from 'react-native';
+import { addItemStyles as styles, welcomeStyles } from './style';
 import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -124,7 +124,13 @@ export default function AddItemScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ImageBackground
+      source={require('../assets/UA.jpeg')}
+      style={{ flex: 1, width: '100%', height: '100%' }}
+      imageStyle={{ resizeMode: 'cover' }}
+    >
+      <View style={welcomeStyles.bgOverlay} />
+      <ScrollView style={[styles.container, { backgroundColor: 'transparent' }]}> 
       <Text style={styles.label}>What is the item?</Text>
       <TextInput style={styles.input} placeholder="e.g. Blue Wallet" value={title} onChangeText={setTitle} />
       
@@ -158,7 +164,8 @@ export default function AddItemScreen({ navigation }) {
       </View>
 
       <Button title={loading ? "Posting..." : "Post Item"} onPress={handleSubmit} disabled={loading} />
-    </ScrollView>
+      </ScrollView>
+    </ImageBackground>
   );
 }
 

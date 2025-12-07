@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Alert, Image, ScrollView } from 'react-native';
-import { detailStyles as styles } from './style';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, TextInput, Button, Alert, Image, ScrollView, ImageBackground, Animated } from 'react-native';
+import { detailStyles as styles, welcomeStyles } from './style';
 import axios from 'axios';
 
 // Try multiple hosts as fallback
@@ -51,6 +51,35 @@ export default function DetailScreen({ route, navigation }) {
   const [description, setDescription] = useState(item.description);
   const [loading, setLoading] = useState(false);
 
+  // Animated pill for detail screen
+  const DetailStatus = ({ status, inline }) => {
+    const opacity = useRef(new Animated.Value(0)).current;
+    const translateX = useRef(new Animated.Value(-10)).current;
+    useEffect(() => {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 420, useNativeDriver: true }),
+        Animated.timing(translateX, { toValue: 0, duration: 420, useNativeDriver: true }),
+      ]).start();
+    }, []);
+
+    const isLost = status === 'LOST';
+
+    const baseStyle = [styles.detailStatusPill, isLost ? styles.detailLost : styles.detailFound, { opacity, transform: [{ translateX }] }];
+    if (inline) {
+      return (
+        <Animated.View style={baseStyle}>
+          <Text style={styles.detailStatusPillText}>{status}</Text>
+        </Animated.View>
+      );
+    }
+
+    return (
+      <Animated.View style={[...baseStyle, styles.detailPillAbsolute]}>
+        <Text style={styles.detailStatusPillText}>{status}</Text>
+      </Animated.View>
+    );
+  };
+
   // DELETE Function
   const handleDelete = async () => {
     try {
@@ -90,7 +119,13 @@ export default function DetailScreen({ route, navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ImageBackground
+      source={require('../assets/UA.jpeg')}
+      style={{ flex: 1, width: '100%', height: '100%' }}
+      imageStyle={{ resizeMode: 'cover' }}
+    >
+      <View style={welcomeStyles.bgOverlay} />
+      <ScrollView style={[styles.container, { backgroundColor: 'transparent' }]}> 
       {isEditing ? (
         // EDIT MODE
         <>
@@ -104,10 +139,16 @@ export default function DetailScreen({ route, navigation }) {
       ) : (
         // VIEW MODE
         <>
-          {item.image && (
-            <Image source={{ uri: getFullImageUrl(item.image) }} style={styles.detailImage} />
+          {item.image ? (
+            <View style={{position: 'relative'}}>
+              <Image source={{ uri: getFullImageUrl(item.image) }} style={styles.detailImage} />
+
+              {/* Animated detail pill overlapping image */}
+              <DetailStatus status={item.status} />
+            </View>
+          ) : (
+            <DetailStatus status={item.status} inline />
           )}
-          <Text style={styles.status}>{item.status}</Text>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.desc}>{description}</Text>
           <Text style={styles.contact}>Contact: {item.contact_info}</Text>
@@ -120,7 +161,8 @@ export default function DetailScreen({ route, navigation }) {
           </View>
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+    </ImageBackground>
   );
 }
 

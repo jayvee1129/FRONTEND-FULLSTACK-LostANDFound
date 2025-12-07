@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image, TextInput } from 'react-native';
-import { homeStyles as styles } from './style';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image, TextInput, ImageBackground, Animated } from 'react-native';
+import { homeStyles as styles, welcomeStyles } from './style';
 import axios from 'axios';
 import { useIsFocused } from '@react-navigation/native';
 
@@ -38,6 +38,27 @@ function getFullImageUrl(imagePath) {
 }
 
 export default function HomeScreen({ navigation }) {
+
+  // Animated status pill component to fade in per-item
+  const StatusPill = ({ status }) => {
+    const opacity = useRef(new Animated.Value(0)).current;
+    const translateX = useRef(new Animated.Value(-8)).current;
+    useEffect(() => {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 360, useNativeDriver: true }),
+        Animated.timing(translateX, { toValue: 0, duration: 360, useNativeDriver: true }),
+      ]).start();
+    }, []);
+
+    const isLost = status === 'LOST';
+
+    return (
+      <Animated.View style={[styles.statusPill, isLost ? styles.lostPill : styles.foundPill, styles.statusAbsolute, { opacity, transform: [{ translateX }] }]}>
+        <Text style={styles.statusPillText}>{status}</Text>
+      </Animated.View>
+    );
+  };
+
   const [items, setItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -130,7 +151,13 @@ export default function HomeScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <ImageBackground
+      source={require('../assets/UA.jpeg')}
+      style={{ flex: 1, width: '100%', height: '100%' }}
+      imageStyle={{ resizeMode: 'cover' }}
+    >
+      <View style={welcomeStyles.bgOverlay} />
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}> 
       {loading ? <ActivityIndicator size="large" /> : (
         <>
           <View>
@@ -180,8 +207,9 @@ export default function HomeScreen({ navigation }) {
             renderItem={({ item }) => (
             <TouchableOpacity onPress={() => navigation.navigate('Detail', { item })}>
               {item.image ? (
-                // WITH IMAGE: horizontal card
+                // WITH IMAGE: horizontal card that also shows description and a status/date row
                 <View style={styles.cardRow}>
+                  <StatusPill status={item.status} />
                   <View style={styles.leftThumbWrap}>
                     <Image 
                       source={{ uri: getFullImageUrl(item.image) }} 
@@ -192,23 +220,25 @@ export default function HomeScreen({ navigation }) {
                   </View>
 
                   <View style={styles.contentRight}>
-                    <View style={styles.rowTop}>
-                      <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-                      <Text style={[styles.badge, item.status === 'LOST' ? styles.lost : styles.found]}>{item.status}</Text>
-                    </View>
+                      <View style={styles.rowTop}>
+                        <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+                      </View>
 
-                    <Text numberOfLines={1} style={styles.subtitle}>{item.description}</Text>
-                    <Text style={styles.date}>{new Date(item.date_posted).toLocaleDateString()}, {new Date(item.date_posted).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                      <Text numberOfLines={2} style={[styles.subtitle, {marginTop: 6}]}>{item.description || ''}</Text>
+
+                      <Text style={styles.date}>{new Date(item.date_posted).toLocaleDateString()}, {new Date(item.date_posted).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
                   </View>
                 </View>
               ) : (
-                // NO IMAGE: vertical card with Status/Date
+                // NO IMAGE: vertical card now shows title, description, status and date in the same order
                 <View style={styles.cardNoImage}>
+                  <StatusPill status={item.status} />
                   <Text style={styles.cardValue} numberOfLines={1}>{item.title}</Text>
+
+                  <Text style={[styles.subtitle, {marginTop: 8, marginBottom: 6}]} numberOfLines={3}>{item.description || ''}</Text>
+
                   
-                  <Text style={styles.cardLabel}>Status: <Text style={[styles.statusBadgeText, item.status === 'LOST' ? styles.lostText : styles.foundText]}>{item.status}</Text></Text>
-                  
-                  <Text style={styles.cardDate}>{new Date(item.date_posted).toLocaleDateString()}, {new Date(item.date_posted).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+                  <Text style={styles.date}>{new Date(item.date_posted).toLocaleDateString()}, {new Date(item.date_posted).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -216,7 +246,8 @@ export default function HomeScreen({ navigation }) {
         />
           </>
       )}
-    </View>
+      </View>
+    </ImageBackground>
   );
 }
 
